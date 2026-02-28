@@ -3,12 +3,17 @@ using namespace std;
 using ll=long long;
 using lll=__int128;
 
+ll global_root=-1;
+ll global_root_1=-1;
+constexpr ll global_root_pw=1<<23;
+constexpr ll mod=998244353;
+
 ll exp(ll a, ll w, ll m){
 	a%=m;
 	ll res=1;
 	while(w){
-		if(w&1)res=(lll)res*a%m;
-		a=(lll)a*a%m;
+		if(w&1)res=res*a%m;
+		a=a*a%m;
 		w>>=1;
 	}
 	return res;
@@ -214,41 +219,52 @@ struct Poly{
 	Poly operator%=(const Poly&b){
 		return *this=(*this)%b;
 	}
+	
+	inline static vector<int>rt2;
+	void init_ntt(int n){
+		static int cur=1;
+		if(cur>=n)return;
+		rt2.resize(n);
+		for(int k=cur;k<n;k<<=1){
+			ll wlen=exp(global_root,global_root_pw/(k<<1),mod);
+			rt2[k]=1;
+			for(int i=1;i<k;++i)
+			rt2[k+i]=(int)(1ll*rt2[k+i-1]*wlen%mod);
+		}
+		cur=n;
+	}
 
 	void fft(vector<int>&a, bool f){
-		int n=a.size();
-		for(int i=1,j=0;i<n;++i){
-			int b=n>>1;
-			for(;j&b;b>>=1)j^=b;
-			j^=b;
-			if(i<j)swap(a[i],a[j]);
-		}
-
-		for(int len=2;len<=n;len<<=1){
-			int wlen = exp(f?root_1:root,root_pw/len,mod);
-			for(int i=0;i<n;i+=len){
-				  int w=1;
-				for(int j=0;j*2<len;++j){
-					int u=a[i+j], v=(int)(1ll*a[i+j+len/2]*w%mod);
-					a[i+j]=u+v<mod?u+v:u+v-mod;
-					a[i+j+len/2]=u-v>=0?u-v:u-v+mod;
-					w=(int)(1ll*w*wlen%mod);
-				}
-			}
-		}
-		if(f){
-			int n1=exp(n,mod-2,mod);
-			for(int&x:a)
-				  x=(int)(1ll*x*n1%mod);
-		}
+		int n = a.size();
+		init_ntt(n);
+		vector<int>rev(n);
+		for(int i=0;i<n;++i)
+			rev[i]=(rev[i>>1]>>1)|((i&1)?(n>>1):0);
+    		for(int i=0;i<n;++i) 
+			if(i<rev[i])swap(a[i],a[rev[i]]);
+    		for(int k=1;k<n;k<<=1){
+        		for(int i=0;i<n;i+=(k<<1)){
+        	    		for(int j=0;j<k;++j){
+                			int u=a[i+j];
+                			int v=(int)(1ll*a[i+j+k]*rt2[k+j]%mod);
+                			a[i+j]=u+v<mod?u+v:u+v-mod;
+                			a[i+j+k]=u-v<0?u-v+mod:u-v;
+            			}
+        		}
+    		}
+    		if(f){
+        		reverse(a.begin()+1,a.end());
+        		ll n1=exp(n,mod-2,mod);
+        		for(int&x:a)x=(int)(1ll*x*n1%mod);
+    		}
 	}
 
 	vector<int>mult(const vector<int>&a, const vector<int>&b){
-		vector<int>a2(a.begin(),a.end()),b2(b.begin(),b.end());
 		int n=1;
 		while(n<a.size()+b.size())n<<=1;
-		a2.resize(n);
-		b2.resize(n);
+		vector<int>a2(n,0),b2(n,0);
+		copy(a.begin(),a.end(),a2.begin());
+		copy(b.begin(),b.end(),b2.begin());
 		fft(a2,0);
 		fft(b2,0);
 		for(int i=0;i<n;++i)
@@ -258,10 +274,6 @@ struct Poly{
 	}
 
 	vector<int>conv(const vector<int>&a, const vector<int>&b){
-		if(!~root){
-			root=exp(p_root(mod),c,mod);
-			root_1=exp(root,mod-2,mod);
-		}
 		vector<int>res=mult(a,b);
 		int n=a.size()+b.size();
 		while(res.size()>=n)res.pop_back();
@@ -478,6 +490,7 @@ struct Poly{
 
 void big_norm(vector<int>&a){
 	ll c=0;
+	a.reserve(a.size()+10);
 	for(int i=0;i<a.size() or c;++i){
 		if (i==a.size())a.push_back(0);
 		ll cur=a[i]+c;
@@ -534,21 +547,22 @@ vector<int>big_mul(const vector<int>&a, const vector<int>&b){
 	if (a.empty() or b.empty())return {};
 	Poly pa(a),pb(b);
 	Poly pc=pa*pb;
-	vector<int>res=pc.p;
+	vector<int>res=move(pc.p);
 	big_norm(res);
 	return res;
 }
 
 vector<int>big_inv(const vector<int>&a){
 	int n=a.size();
-	if (n<=2) {
-		ll val=0;
+	if (n<=18){
+		lll val=0;
 		for(int i=n-1;i>=0;--i)val=val*10+a[i];
+		if(val==0)return {};
 		lll num=1;
 		for(int i=0;i<2*n;++i)num*=10;
 		lll q=num/val;
 		vector<int>res;
-		while(q){res.push_back(q%10);q/=10;}
+		while(q){res.push_back((int)(q%10));q/=10;}
 		return res;
 	}
 	int k=(n+1)/2;
@@ -565,28 +579,70 @@ vector<int>big_inv(const vector<int>&a){
 pair<vector<int>,vector<int>>big_div_mod(const vector<int>&a,const vector<int>&b){
 	if(big_cmp(a,b)<0)return {{},a};
 	int m=b.size();
-	if(m<=2){
-		ll b_val=0;
+	int n=a.size();
+	if(m<=36){
+		lll b_val=0;
 		for(int i=m-1;i>=0;--i)b_val=b_val*10+b[i];
-		vector<int>q(a.size());
-		ll rem=0;
-		for(int i=a.size()-1;i>=0;--i){
+		vector<int>q(n,0);
+		lll rem=0;
+		for(int i=n-1;i>=0;--i){
 			rem=rem*10+a[i];
-			q[i]=rem/b_val;
+			q[i]=(int)(rem/b_val);
 			rem%=b_val;
 		}
 		while(!q.empty() and !q.back())q.pop_back();
 		vector<int>r;
-		while(rem){r.push_back(rem%10);rem/=10;}
+		while(rem){r.push_back((int)(rem%10));rem/=10;}
 		return {q,r};
 	}
-	vector<int>z=big_inv(b);
-	vector<int>q=shift_right(big_mul(a,z),2*m);
-	vector<int>r=big_sub(a,big_mul(q,b));
-	vector<int>one={1};
-	while(big_cmp(r,b)>=0) {
-		r=big_sub(r,b);
-		q=big_add(q,one);
+	if(n>=(m<<1) and m>36){
+		int split_pos=(n-m)/2;
+		vector<int>a_h(a.begin()+split_pos,a.end());
+		auto[q_h,r_h]=big_div_mod(a_h,b);
+		vector<int>n_a(a.begin(),a.begin()+split_pos);
+		n_a.insert(n_a.end(),r_h.begin(),r_h.end());
+		while(!n_a.empty() and !n_a.back())n_a.pop_back();
+		auto[q_l,r_f]=big_div_mod(n_a,b);
+		vector<int>q=shift_left(q_h,split_pos);
+		q=big_add(q,q_l);
+		return {q,r_f};
+	}
+	int klen=n-m+1;
+	int keep_b=klen+2;
+	vector<int>q;
+	if(m>keep_b){
+		int chop=m-keep_b;
+		vector<int>a_chop=shift_right(a,chop);
+		vector<int>b_chop=shift_right(b,chop);
+		q=big_div_mod(a_chop,b_chop).first;
+	}else{
+		int k=max(0,n-m);
+		vector<int>b_ext=shift_left(b,k);
+		vector<int>z=big_inv(b_ext);
+		q=shift_right(big_mul(a,z),n+m);
+	}
+	vector<int>qb=big_mul(q,b);
+	vector<int>r;
+
+	if(big_cmp(a,qb)>=0)
+		r=big_sub(a,qb);
+	else{
+		while(big_cmp(a,qb)<0) {
+			q=big_sub(q,{1});
+			qb=big_sub(qb,b);
+		}
+		r=big_sub(a,qb);
+	}
+	if(big_cmp(r,b)>=0){
+		auto[dq,new_r]=big_div_mod(r,b);
+		if(!dq.empty()){
+			q=big_add(q,dq);
+			r=new_r;
+		}
+		while(big_cmp(r,b)>=0){
+			r=big_sub(r,b);
+			q=big_add(q,{1});
+		}
 	}
 	return {q,r};
 }
@@ -596,6 +652,8 @@ int main(){
 	cin.tie(nullptr);
 	cout.tie(nullptr);
 	init();
+	global_root=exp(p_root(mod),119,mod);
+	global_root_1=exp(global_root,mod-2,mod);
 	int t;
 	cin>>t;
 	while(t--){
@@ -615,15 +673,13 @@ int main(){
 		auto[q,r]=big_div_mod(pa,pb);
 		if(q.empty())cout<<0;
 		else{
-			reverse(q.begin(),q.end());
-			for(int i=0;i<q.size();++i)
+			for(int i=q.size()-1;i>=0;--i)
 				cout<<q[i];
 		}
 		cout<<' ';
 		if(r.empty())cout<<0;
 		else{
-			reverse(r.begin(),r.end());
-			for(int i=0;i<r.size();++i)
+			for(int i=r.size()-1;i>=0;--i)
 				cout<<r[i];
 		}
 		cout<<'\n';
