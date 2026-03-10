@@ -138,11 +138,11 @@ ll mod_sqrt(ll a, ll m){
 map<int,int>root_mp;
 
 struct Poly{
-	ll mod=998244353;
-	ll c=119;
-	ll root=-1;
-	ll root_1=-1;
-	ll root_pw=1<<23;
+	static constexpr int mod=998244353;
+	static constexpr int c=119;
+	static constexpr int root_pw=1<<23;
+	static inline int root=-1;
+	static inline int root_1=-1;
 	vector<int>p;
 	Poly(){}
 	Poly(int n){p.assign(n,0);}
