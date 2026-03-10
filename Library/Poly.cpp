@@ -135,6 +135,8 @@ ll mod_sqrt(ll a, ll m){
 	return min(res,m-res);
 }
 
+map<int,int>root_mp;
+
 struct Poly{
 	ll mod=998244353;
 	ll c=119;
@@ -259,8 +261,13 @@ struct Poly{
 
 	vector<int>conv(const vector<int>&a, const vector<int>&b){
         	if(!~root){
-                	root=exp(p_root(mod),c,mod);
-                	root_1=exp(root,mod-2,mod);
+			if(root_mp.count(mod)){
+				root=root_mp[mod];
+				root_1=exp(root,mod-2,mod);
+			}else{
+                		root_mp[mod]=root=exp(p_root(mod),c,mod);
+                		root_1=exp(root,mod-2,mod);
+			}
         	}
         	vector<int>res=mult(a,b);
         	int n=a.size()+b.size();
@@ -465,6 +472,54 @@ struct Poly{
 		return g;
 	}
 
+	vector<int>multipoint_evaluation(const vector<int>&p){
+		int m=p.size();
+		if(!m)return {};
+		vector<Poly>tree(m<<2),inv_tree(m<<2);
+		auto build=[&](auto&self, int v, int l, int r)->void{
+			if(l==r){
+				tree[v]=Poly(2);
+				tree[v][0]=mod-(!p[l]?mod:p[l]);
+				tree[v][1]=1;
+				inv_tree[v]=tree[v].rev().inv(tree[v].size());
+				return;
+			}
+			int mid=(l+r)>>1;
+			self(self,v<<1,l,mid);
+			self(self,v<<1|1,mid+1,r);
+			tree[v]=tree[v<<1]*tree[v<<1|1];
+			inv_tree[v]=tree[v].rev().inv(tree[v].size());
+		};
+		build(build,1,0,m-1);
+		auto mod_fast=[&](const Poly&a, int v)->Poly{
+			if(a.size()<tree[v].size())return a;
+			int qlen=a.size()-tree[v].size()+1;
+			Poly inv=inv_tree[v];
+			if(inv.size()<qlen)inv=tree[v].rev().inv(qlen);
+			else inv.resize(qlen);
+			Poly q_rev=a.rev()*inv;
+			q_rev.resize(qlen);
+			Poly q=q_rev.rev();
+			Poly r=a-q*tree[v];
+			r.resize(tree[v].size()-1);
+			r.trim();
+			return r;
+		};
+		vector<int>ans(m);
+		auto eval=[&](auto&self, const Poly&a, int v, int l, int r)->void{
+			if(l==r){
+				ans[l]=a.empty()?0:a[0];
+				return;
+			}
+			int mid=(l+r)>>1;
+			self(self,mod_fast(a,v<<1),v<<1,l,mid);
+			self(self,mod_fast(a,v<<1|1),v<<1|1,mid+1,r);
+		};
+		Poly a=mod_fast(*this,1);
+		eval(eval,a,1,0,m-1);
+		return ans;
+	}
+
 	friend istream& operator>>(istream&is, Poly&p){
 		for(int i=0;i<p.size();++i)is>>p[i];
 		return is;
@@ -476,20 +531,20 @@ struct Poly{
 	}
 };
 
-// Main function solves poly division from yosupo judge, as an example
+// Main function solves multipoint evaluation from yosupo judge, as an example
 int main(){
 	ios::sync_with_stdio(false);
         cin.tie(nullptr);
         cout.tie(nullptr);
         init();
 	int t=1;
-	while(t--){
-		int n,m;
-		cin>>n>>m;
-		Poly a(n),b(m);
-		cin>>a>>b;
-		Poly q=a/b,r=a%b;
-		cout<<q.size()<<' '<<r.size()<<'\n';
-		cout<<q<<'\n'<<r<<'\n';
-	}
+	int n,m;
+	cin>>n>>m;
+	Poly a(n);
+	cin>>a;
+	vector<int>b(m);
+	for(int&i:b)cin>>i;
+	vector<int>ret=a.multipoint_evaluation(b);
+	for(const int&i:ret)cout<<i<<' ';
+	cout<<'\n';
 }
