@@ -138,11 +138,11 @@ ll mod_sqrt(ll a, ll m){
 map<int,int>root_mp;
 
 struct Poly{
-	ll mod=998244353;
-	ll c=119;
-	ll root=-1;
-	ll root_1=-1;
-	ll root_pw=1<<23;
+	static constexpr int mod=998244353;
+	static constexpr int c=119;
+	static constexpr int root_pw=1<<23;
+	static inline int root=-1;
+	static inline int root_1=-1;
 	vector<int>p;
 	Poly(){}
 	Poly(int n){p.assign(n,0);}
@@ -475,6 +475,16 @@ struct Poly{
 	vector<int>multipoint_evaluation(const vector<int>&p){
 		int m=p.size();
 		if(!m)return {};
+		vector<int>ans(m);
+		if(m<=128){
+			for(int i=0;i<m;++i){
+				ll res=0,px=p[i];
+				for(int j=this->size()-1;j>=0;--j)
+					res=(res*px+(*this)[j])%mod;
+				ans[i]=res;
+			}
+			return ans;
+		}
 		vector<Poly>tree(m<<2),inv_tree(m<<2);
 		auto build=[&](auto&self, int v, int l, int r)->void{
 			if(l==r){
@@ -487,8 +497,18 @@ struct Poly{
 			int mid=(l+r)>>1;
 			self(self,v<<1,l,mid);
 			self(self,v<<1|1,mid+1,r);
-			tree[v]=tree[v<<1]*tree[v<<1|1];
-			inv_tree[v]=tree[v].rev().inv(tree[v].size());
+			if(tree[v<<1].size()<=64){
+				vector<int>res(tree[v<<1].size()+tree[v<<1|1].size()-1);
+				for(int i=0;i<tree[v<<1].size();++i){
+					if(!tree[v<<1][i])continue;
+					for(int j=0;j<tree[v<<1|1].size();++j){
+						res[i+j]+=1ll*tree[v<<1][i]*tree[v<<1|1][j]%mod;
+						if(res[i+j]>=mod)res[i+j]-=mod;
+					}
+				}
+				tree[v]=Poly(res);
+			}else tree[v]=tree[v<<1]*tree[v<<1|1];
+			if(r-l>128)inv_tree[v]=tree[v].rev().inv(tree[v].size());
 		};
 		build(build,1,0,m-1);
 		auto mod_fast=[&](const Poly&a, int v)->Poly{
@@ -505,21 +525,116 @@ struct Poly{
 			r.trim();
 			return r;
 		};
-		vector<int>ans(m);
 		auto eval=[&](auto&self, const Poly&a, int v, int l, int r)->void{
-			if(l==r){
-				ans[l]=a.empty()?0:a[0];
+			if(r-l<=128){
+				for(int i=l;i<=r;++i){
+					ll res=0,px=p[i];
+					for(int j=a.size()-1;j>=0;--j)
+						res=(res*px+a[j])%mod;
+					ans[i]=res;
+				}
 				return;
 			}
 			int mid=(l+r)>>1;
-			self(self,mod_fast(a,v<<1),v<<1,l,mid);
-			self(self,mod_fast(a,v<<1|1),v<<1|1,mid+1,r);
+			self(self,(mid-l<=128)?a:mod_fast(a,v<<1),v<<1,l,mid);
+			self(self,(r-mid-1<=128)?a:mod_fast(a,v<<1|1),v<<1|1,mid+1,r);
 		};
 		Poly a=mod_fast(*this,1);
 		eval(eval,a,1,0,m-1);
 		return ans;
 	}
 
+	friend Poly interpolate(const vector<int>&x, const vector<int>&y, Poly _=Poly()){
+		int m=x.size();
+		if(!m)return Poly();
+		int mod=_.mod;
+		if(m<=128){
+			vector<int>w(m);
+			for(int i=0;i<m;++i){
+				ll d=1;
+				for(int j=0;j<m;++j){
+					if(i==j)continue;
+					d=d*(x[i]-x[j]+mod)%mod;
+				}
+				w[i]=1ll*y[i]*exp(d,mod-2,mod)%mod;
+			}
+			vector<int>M(m+1,0);
+			M[0]=1;
+			for(int i=0;i<m;++i){
+				ll d=mod-(!x[i]?mod:x[i]);
+				for(int j=i;j>=0;--j){
+					M[j+1]+=M[j];
+					if(M[j+1]>=mod)M[j+1]-=mod;
+					M[j]=1ll*M[j]*d%mod;
+				}
+			}
+			Poly ret(m);
+			for(int i=0;i<m;++i){
+				ll q=0;
+				for(int j=m;j>=1;--j){
+					ll c=M[j]+q*x[i]%mod;
+					if(c>=mod)c-=mod;
+					ret[j-1]+=c*w[i]%mod;
+					if(ret[j-1]>=mod)ret[j-1]-=mod;
+					q=c;
+				}
+			}
+			return ret;
+		}
+		vector<Poly>tree(m<<2);
+		auto build=[&](auto&self, int v, int l, int r)->void{
+			if(l==r){
+				tree[v]=Poly(2);
+				tree[v][0]=mod-(!x[l]?mod:x[l]);
+				tree[v][1]=1;
+				return;
+			}
+			int mid=(l+r)>>1;
+			self(self,v<<1,l,mid);
+			self(self,v<<1|1,mid+1,r);
+			if(tree[v<<1].size()<=64){
+				vector<int>res(tree[v<<1].size()+tree[v<<1|1].size()-1);
+				for(int i=0;i<tree[v<<1].size();++i){
+					if(!tree[v<<1][i])continue;
+					for(int j=0;j<tree[v<<1|1].size();++j){
+						res[i+j]+=1ll*tree[v<<1][i]*tree[v<<1|1][j]%mod;
+						if(res[i+j]>=mod)res[i+j]-=mod;
+					}
+				}
+				tree[v]=Poly(res);
+			}else tree[v]=tree[v<<1]*tree[v<<1|1];
+		};
+		build(build,1,0,m-1);
+		Poly d=tree[1].deriv();
+		vector<int>vals=d.multipoint_evaluation(x);
+		auto up=[&](auto&self, int v, int l, int r)->Poly{
+			if(l==r){
+				Poly p(1);
+				p[0]=1ll*y[l]*exp(vals[l],mod-2,mod)%mod;
+				return p;
+			}
+			int mid=(l+r)>>1;
+			Poly lef=self(self,v<<1,l,mid);
+			Poly rig=self(self,v<<1|1,mid+1,r);
+			if(lef.size()<=64 or rig.size()<=64){
+				vector<int>resl(lef.size()+tree[v<<1|1].size()-1);
+				for(int i=0;i<lef.size();++i)
+					for(int j=0;j<tree[v<<1|1].size();++j){
+						resl[i+j]+=1ll*lef[i]*tree[v<<1|1][j]%mod;
+						if(resl[i+j]>=mod)resl[i+j]-=mod;
+					}
+				vector<int>resr(rig.size()+tree[v<<1].size()-1);
+                                for(int i=0;i<rig.size();++i)
+                                        for(int j=0;j<tree[v<<1].size();++j){
+                                                resr[i+j]+=1ll*rig[i]*tree[v<<1][j]%mod;
+                                                if(resr[i+j]>=mod)resr[i+j]-=mod;
+                                        }
+				return Poly(resl)+Poly(resr);
+			}
+			return lef*tree[v<<1|1]+rig*tree[v<<1];
+		};
+		return up(up,1,0,m-1);
+	}
 	friend istream& operator>>(istream&is, Poly&p){
 		for(int i=0;i<p.size();++i)is>>p[i];
 		return is;
@@ -531,20 +646,18 @@ struct Poly{
 	}
 };
 
-// Main function solves multipoint evaluation from yosupo judge, as an example
+// Solves Interpolation problem from yosupo judge as an example
 int main(){
 	ios::sync_with_stdio(false);
         cin.tie(nullptr);
         cout.tie(nullptr);
         init();
-	int t=1;
-	int n,m;
-	cin>>n>>m;
-	Poly a(n);
-	cin>>a;
-	vector<int>b(m);
-	for(int&i:b)cin>>i;
-	vector<int>ret=a.multipoint_evaluation(b);
-	for(const int&i:ret)cout<<i<<' ';
-	cout<<'\n';
+	int n;
+	cin>>n;
+	vector<int>x(n),y(n);
+	for(int&i:x)cin>>i;
+	for(int&i:y)cin>>i;
+	Poly a=interpolate(x,y,Poly());
+	a.resize(n);
+	cout<<a<<'\n';
 }
