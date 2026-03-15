@@ -27,7 +27,7 @@ void fwht(vector<int>&a, bool f){
                                 	if(a[i+j]>=mod)a[i+j]-=mod;
 				}else{
                                 	a[i+j]=u-v;
-                                	if(a[i+j]<0)a[i+j+len]+=mod;
+                                	if(a[i+j]<0)a[i+j]+=mod;
 				}
                         }
 }
