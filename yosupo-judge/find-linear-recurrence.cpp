@@ -18,25 +18,24 @@ ll exp(ll a, ll w){
 vector<int>berlekamp(vector<int>a){
 	int n=a.size();
 	if(!n)return vector<int>();
-	vector<ll>C,B;
-	C=B={1};
+	vector<int>C={1},B={1};
 	int L=0;
 	ll b=1;
-	for(int i=0,m=1,i<n;++i){
+	for(int i=0,m=1;i<n;++i){
 		ll d=0;
 		for(int j=0;j<=L;++j)
 			if(j<C.size())
-				d=(d+C[j]*a[i-j])%mod;
+				d=(d+1ll*C[j]*a[i-j])%mod;
 		if(!d)++m;
-		else{
-			vector<ll>T=C;
+		else{	
+			vector<int>T=C;
 			ll c=d*exp(b,mod-2)%mod;
 			while(C.size()<=B.size()+m)C.push_back(0);
 			for(int j=0;j<B.size();++j){
-				C[j+m]=(C[j+m]-c*B[j])%mod;
+				C[j+m]=(C[j+m]-1ll*c*B[j])%mod;
 				if(C[j+m]<0)C[j+m]+=mod;
 			}
-			if((L<<1)<i){
+			if((L<<1)<=i){
 				L=i+1-L;
 				B=T;
 				b=d;
@@ -44,6 +43,7 @@ vector<int>berlekamp(vector<int>a){
 			}else ++m;
 		}
 	}
+	C.resize(L+1);
 	return C;
 }
 
@@ -56,6 +56,12 @@ int main(){
 	vector<int>a(n);
 	for(int&i:a)cin>>i;
 	auto b=berlekamp(a);
-	for(const int&i:b)cout<<i<<' ';
+	if(b.empty()){
+		cout<<0<<'\n';
+		return 0;
+	}
+	b.erase(b.begin());
+	cout<<b.size()<<'\n';
+	for(const int&i:b)cout<<(mod-(!i?mod:i))<<' ';
 	cout<<'\n';
 }
