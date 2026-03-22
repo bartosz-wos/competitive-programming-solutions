@@ -1,0 +1,60 @@
+#include <bits/stdc++.h>
+using namespace std;
+#define int long long
+
+
+
+int32_t main() {
+	int t; cin>>t; 
+	while(t--){
+	    int n;cin>>n;
+	    vector<int>pos(n), power(n);
+	    for(auto &it: pos) cin>>it;
+	    for(auto &it: power)  cin>>it;
+	    int ansExist  = 0;
+	    int rightStop = -1;
+	    for(int i = 0; i<n; i++){
+	        if(i == n-1) ansExist = 1;
+	        else if(pos[i] + power[i] >= pos[i+1]) continue;
+	        else{
+	            rightStop = i;
+	            for(int j = i+1; j<n; j++){
+	                if(j == n-1) ansExist  = 1;
+	                else if(pos[j] + power[j] >= pos[j+1]) continue;
+	                else break;
+	            }
+	            break;
+	        }
+	    }
+	    int leftStop = -1;
+	    for(int i  = n-1; i>=0; i--){
+	        if(i == 0) ansExist = 1;
+	        else if(pos[i] - power[i] <= pos[i-1]) continue;
+	        else{
+	            leftStop = i;
+	            for(int j = i-1; j>=0; j--){
+	                if(j == 0) ansExist = 1;
+	                else if(pos[j] - power[j] <= pos[j-1]) continue;
+	                else break;
+	            }
+	            break;
+	        }
+	    }
+	   if(rightStop >= leftStop) ansExist = 1;
+	   else if(rightStop + 1 == leftStop) ansExist = 1;
+	   for(int i = 0; i<n; i++){
+	       if(i == n-1) ansExist = 1;
+	       else if(pos[i+1] - power[i+1] <= pos[i] ) continue;
+	       else{
+	           for(int j = i+1; j<n; j++){
+	               if(j == n-1) ansExist = 1;
+	               else if(pos[j] + power[j] >= pos[j+1]) continue;
+	               else break;
+	           }
+	           break;
+	       }
+	   }
+	   if(ansExist) cout<<"YES"<<endl;
+	   else cout<<"NO"<<endl;
+	}
+}
