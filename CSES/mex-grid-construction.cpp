@@ -15,4 +15,4 @@ int main(){
             cout<<(i^j)<<' ';
         cout<<'\n';
     }
-
+}
