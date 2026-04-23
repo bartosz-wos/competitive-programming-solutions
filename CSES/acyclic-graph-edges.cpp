@@ -1,0 +1,17 @@
+#include<bits/stdc++.h>
+using namespace std;
+int n, m;
+ 
+int main() {
+	ios::sync_with_stdio(false);
+	cin.tie(nullptr);
+	cout.tie(nullptr);
+	cin >> n >> m;
+	while(m--) {
+		int a, b;
+		cin >> a >> b;
+		if(a > b)
+			swap(a, b);
+		cout << a << ' ' << b << '\n';
+	}
+}
